@@ -1,4 +1,7 @@
 import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class piazzaController extends DBConn {
@@ -33,12 +36,12 @@ public class piazzaController extends DBConn {
 	 * */
 	public boolean logInUser(String email, String passord) {
 		try {
-			PreparedStatement statement = this.conn.prepareStatement("select username from user where user.email=(?) and user.userPassword=(?)");
+			PreparedStatement statement = this.conn.prepareStatement("select email from user where user.email=(?) and user.userPassword=(?)");
 			statement.setString(1, email);
 			statement.setString(2, passord);
 			ResultSet rs = statement.executeQuery();
 			if(rs.next()) {  // Hvis next er true, finnes en bruker med den eposten og det passordet som er oppgitt.
-				this.email = rs.getString("username");
+				this.email = rs.getString("email");
 				System.out.println("Du er logget inn som " + this.email);
 				return true;
 			}
@@ -66,30 +69,37 @@ public class piazzaController extends DBConn {
 	}
 	
 	
+	// TODO Denne metoden er ikke testet
 	public boolean post(String content, String postName,  String folder, String tag, String courseID, boolean anonymous) {
 		if(this.email == null) {
 			throw new IllegalStateException("Du må være logget inn for å poste.");
 		}
 		try {
 			
-			PreparedStatement statement = this.conn.prepareStatement("select courceID, year, folder.name, allowAnonymous from user inner join memberOfCourse using email"
-					+ " inner join courseInYear on memberOfCourse.courceID = courseInYear.courseID and memberOfCourse.year = courseInYear.year"
-					+ " inner join folder on folder.courseID = courseInYear.courseID and folder.year = courseInYear.year"
-					+ " where email = (?) and courseID = (?)"
-					+ " ordered by year desc");
+			PreparedStatement statement = this.conn.prepareStatement("select courseInYear.courseID, courseInYear.courseYear, folder.folderName, allowAnonumous from user inner join memberOfCourse on user.email = memberOfCourse.email \n" + 
+					"	inner join courseInYear on memberOfCourse.courseID = courseInYear.courseID\n" + 
+					"    inner join course on course.courseID = courseInYear.courseID\n" + 
+					"	inner join folder on folder.courseID = courseInYear.courseID and folder.folderYear = courseInYear.courseYear\n" + 
+					"	where user.email = (?) and course.courseName = (?)\n" + 
+					"	order by courseYear desc");
 			statement.setString(1, this.email);
 			statement.setString(2, courseID);
+			System.out.println(statement);
 			ResultSet rs = statement.executeQuery();
-			String courseID1;
+			String courseID1 = null;
 			int year = 0;
-			String folderName;
+			String folderName = null;
 			boolean anonymousAllowed = false;
 			while (rs.next()) {
-				if(rs.getString("folder.name").equals(folder)) {
-					courseID1 = rs.getString("courseID");
-					year = rs.getInt("year");
-					folderName = rs.getString("folder.name");
-					anonymousAllowed = rs.getBoolean("allowAnonymous");
+				if(rs.getString("folder.folderName").equals(folder)) {
+					courseID1 = rs.getString("courseInYear.courseID");
+					year = rs.getInt("courseInYear.courseYear");
+					folderName = rs.getString("folder.folderName");
+					anonymousAllowed = rs.getBoolean("allowAnonumous");
+					System.out.println(courseID1);
+					System.out.println(year);
+					System.out.println(folderName);
+					System.out.println(anonymousAllowed);
 				}
 			}
 			if(year == 0) {
@@ -109,11 +119,20 @@ public class piazzaController extends DBConn {
 				throw new IllegalArgumentException("Course doesn't allow anonymous posts.");
 			}
 			statement.setBoolean(7, anonymous);
-			// TODO Sett statement time
-			// TODO lag tuppel i threadInFolder skjemaet.
+			long milliseconds = System.currentTimeMillis();
+			statement.setTime(8, new Time(milliseconds));
+			statement.execute();
+			statement = this.conn.prepareStatement("INSERT INTO threadInFolder VALUES ( (?), (?), (?), (?) )");
+			statement.setInt(1, this.totalPosts);
+			statement.setString(2, folderName);
+			statement.setString(3, courseID1);
+			statement.setInt(4, year);
+			statement.execute();
 		} catch(SQLException e) {
-			
+			throw new RuntimeException("Det oppsto en feil", e);
 		}
+		System.out.println(content + "\n" + "Din post er lagret");
+		return true;
 	}
 	
 	public boolean post(String content, String postName,  String folder, String courseID, boolean anonymous) {
@@ -127,8 +146,16 @@ public class piazzaController extends DBConn {
 	
 	public static void main(String[] args) {
 		piazzaController controller = new piazzaController();
-		// controller.logInUser("bendik@gmail.com", "bendik");
+		controller.logInUser("bendik@gmail.com", "bendik");
+		controller.post("Min første post", "første", "eksamen", "question", "TDT4100", false);
 	}
+	
+
+//# insert into user values("bendik@gmail.com", "bendik", "bendik");
+//-- insert into course values(1, "TDT4100", "vår");
+//-- insert into courseInYear values(1, 2021, true); 
+//-- insert into memberOfCourse values("bendik@gmail.com", 1, 2021, false);
+//-- insert into folder values(1, 2021, "eksamen");
 	
 	
 }
