@@ -50,8 +50,7 @@ public class piazzaController extends DBConn {
 	}
 	
 	
-	// TODO Denne metoden er ikke testet
-	public boolean post(String content, String postName,  String folder, String tag, String courseID, boolean anonymous, int threadID) {
+	public boolean post(String content, String postName,  String folder, String tag, String courseName, boolean anonymous, int threadID) {
 		if(this.email == null) {
 			throw new IllegalStateException("Du må være logget inn for å poste.");
 		}
@@ -64,7 +63,7 @@ public class piazzaController extends DBConn {
 					"	where user.email = (?) and course.courseName = (?)\n" + 
 					"	order by courseYear desc");
 			statement.setString(1, this.email);
-			statement.setString(2, courseID);
+			statement.setString(2, courseName);
 			ResultSet rs = statement.executeQuery();
 			String courseID1 = null;
 			int year = 0;
@@ -91,6 +90,9 @@ public class piazzaController extends DBConn {
 			if(tag != null) {
 				statement.setString(6, tag);
 			}
+			else {
+				statement.setNull(6, 0);
+			}
 			if (anonymous && !anonymousAllowed) {
 				throw new IllegalArgumentException("Course doesn't allow anonymous posts.");
 			}
@@ -111,19 +113,38 @@ public class piazzaController extends DBConn {
 		return true;
 	}
 	
-	public boolean post(String content, String postName,  String folder, String courseID, boolean anonymous, int threadID) {
-		return this.post(content, postName, folder, null, courseID, anonymous, threadID);
+	public boolean post(String content, String postName,  String folder, String courseName, boolean anonymous, int threadID) {
+		return this.post(content, postName, folder, null, courseName, anonymous, threadID);
 	}
 
-	public boolean replyTo(int postID, String replyText, String replyName, String tag, boolean isAnonymous) {
+	public boolean replyTo(int postID, String replyText, String replyName, boolean isAnonymous) {
 		try {
 			// Vi må først finne threadID til posten vi skal svare på
-			PreparedStatement statement = this.conn.prepareStatement("get threadID, folderName, courseID from postID");
+			PreparedStatement statement = this.conn.prepareStatement(" select threadID from post\n" + 
+					" where post.postID = (?)");
+			statement.setInt(1, postID);
 			ResultSet rs = statement.executeQuery();
-			this.post(replyText, replyName, folderName, courseID, isAnonymous, threadID);
-			statement = this.conn.prepareStatement("insert this.post, postID into replyTo");
+			if (!rs.next()) {
+				throw new IllegalArgumentException("Det finnes ikke post med denne postID-en");
+			}
+			int threadID = rs.getInt("threadID");
+			statement = this.conn.prepareStatement("select folderName, courseName\n" + 
+					" from post inner join threadInFolder on threadInFolder.postID = post.postID\n" + 
+					" inner join courseInYear on courseInYear.courseID = threadInFolder.folderCourseID \n" + 
+					" and courseInYear.courseYear = threadInFolder.folderCourseYear\n" + 
+					" inner join course on course.courseID = courseInYear.courseID\n" + 
+					" where post.threadID = (?)");
+			statement.setInt(1, threadID);
+			rs = statement.executeQuery();
+			rs.next();
+			String folderName = rs.getString("folderName");
+			String courseName = rs.getString("courseName");
+			this.post(replyText, replyName, folderName, courseName, isAnonymous, threadID);
+			statement = this.conn.prepareStatement("insert into replyTo values ( (?), (?) )");
+			statement.setInt(1, this.totalPosts);
+			statement.setInt(2, threadID);
 			statement.execute();
-			System.out.printlnf("Du har svart på post med id: postID");
+			System.out.println("Du har svart på post med id: " + this.totalPosts);
 		} catch (SQLException throwables) {
 			throw new RuntimeException("Det oppsto en feil i replyTo", throwables);
 		}
@@ -139,7 +160,7 @@ public class piazzaController extends DBConn {
 		controller.logInUser("bendik@gmail.com", "bendik");
 		controller.post("Min første post", "første", "eksamen", "question", "TDT4100", false, 1);
 		controller.post("Min andre post", "andre", "eksamen", "question", "TDT4100", false, 2);
-		// controller.replyTo(1, "hei");
+		controller.replyTo(1, "hei", "første reply", true);
 	}
 	
 
