@@ -10,25 +10,6 @@ public class piazzaController extends DBConn {
     private String email;
     private int totalPosts;
 
-	
-	public piazzaController() {
-//        try { 
-//            regStatement = conn.prepareStatement("INSERT INTO course VALUES ( (?), (?), (?) )"); 
-//        } catch (Exception e) { 
-//            System.out.println("db error during prepare of insert into pizzatyper.");
-//        }
-//        try {
-//        	regStatement.setInt(1, 1);
-//			regStatement.setString(2, "OOP");
-//			regStatement.setString(3, "Høst");
-//			regStatement.execute();
-//		} catch (SQLException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-		
-	}
-	
 	/**
 	 * Metode som logger en bruker inn.
 	 * @param bruker email
@@ -70,7 +51,7 @@ public class piazzaController extends DBConn {
 	
 	
 	// TODO Denne metoden er ikke testet
-	public boolean post(String content, String postName,  String folder, String tag, String courseID, boolean anonymous) {
+	public boolean post(String content, String postName,  String folder, String tag, String courseID, boolean anonymous, int threadID) {
 		if(this.email == null) {
 			throw new IllegalStateException("Du må være logget inn for å poste.");
 		}
@@ -84,7 +65,6 @@ public class piazzaController extends DBConn {
 					"	order by courseYear desc");
 			statement.setString(1, this.email);
 			statement.setString(2, courseID);
-			System.out.println(statement);
 			ResultSet rs = statement.executeQuery();
 			String courseID1 = null;
 			int year = 0;
@@ -96,10 +76,6 @@ public class piazzaController extends DBConn {
 					year = rs.getInt("courseInYear.courseYear");
 					folderName = rs.getString("folder.folderName");
 					anonymousAllowed = rs.getBoolean("allowAnonumous");
-					System.out.println(courseID1);
-					System.out.println(year);
-					System.out.println(folderName);
-					System.out.println(anonymousAllowed);
 				}
 			}
 			if(year == 0) {
@@ -108,7 +84,7 @@ public class piazzaController extends DBConn {
 			statement = this.conn.prepareStatement("INSERT INTO post VALUES ( (?), (?), (?), (?), (?), (?), (?), (?))");
 			this.totalPosts += 1;
 			statement.setInt(1, this.totalPosts);
-			statement.setInt(2, 1);
+			statement.setInt(2, threadID);
 			statement.setString(3, this.email);
 			statement.setString(4, postName);
 			statement.setString(5, content);
@@ -135,19 +111,35 @@ public class piazzaController extends DBConn {
 		return true;
 	}
 	
-	public boolean post(String content, String postName,  String folder, String courseID, boolean anonymous) {
-		return this.post(content, postName, folder, null, courseID, anonymous);
+	public boolean post(String content, String postName,  String folder, String courseID, boolean anonymous, int threadID) {
+		return this.post(content, postName, folder, null, courseID, anonymous, threadID);
 	}
-	
-	
-	
-	
-	
-	
+
+	public boolean replyTo(int postID, String replyText, String replyName, String tag, boolean isAnonymous) {
+		try {
+			// Vi må først finne threadID til posten vi skal svare på
+			PreparedStatement statement = this.conn.prepareStatement("get threadID, folderName, courseID from postID");
+			ResultSet rs = statement.executeQuery();
+			this.post(replyText, replyName, folderName, courseID, isAnonymous, threadID);
+			statement = this.conn.prepareStatement("insert this.post, postID into replyTo");
+			statement.execute();
+			System.out.printlnf("Du har svart på post med id: postID");
+		} catch (SQLException throwables) {
+			throw new RuntimeException("Det oppsto en feil i replyTo", throwables);
+		}
+		return true;
+	}
+
+	public boolean searchFor(String content) {
+		return true;
+	}
+
 	public static void main(String[] args) {
 		piazzaController controller = new piazzaController();
 		controller.logInUser("bendik@gmail.com", "bendik");
-		controller.post("Min første post", "første", "eksamen", "question", "TDT4100", false);
+		controller.post("Min første post", "første", "eksamen", "question", "TDT4100", false, 1);
+		controller.post("Min andre post", "andre", "eksamen", "question", "TDT4100", false, 2);
+		// controller.replyTo(1, "hei");
 	}
 	
 
@@ -156,6 +148,22 @@ public class piazzaController extends DBConn {
 //-- insert into courseInYear values(1, 2021, true); 
 //-- insert into memberOfCourse values("bendik@gmail.com", 1, 2021, false);
 //-- insert into folder values(1, 2021, "eksamen");
-	
-	
+
+	// Skal sjekke om brukeren er en instruktør
+	/*PreparedStatement statement = this.conn.prepareStatement("select isInstructor from post \n" +
+			"\tinner join threadinfolder on post.threadID = threadinfolder.postID\n" +
+			"    inner join courseinyear on folderCourseID = courseinyear.courseID\n" +
+			"    inner join memberofcourse on courseinyear.courseID = memberofcourse.courseID\n" +
+			"    where memberofcourse.email = (?) and post.postID = (?)");
+			statement.setString(1, "jarl@gmail.com");
+			statement.setInt(2, postID);
+	ResultSet rs = statement.executeQuery();
+	boolean isInstructor = false;
+			if (rs.next()) {
+		isInstructor = rs.getBoolean("isInstructor");
+		System.out.println(isInstructor);
+	}
+			else {
+		throw new RuntimeException("Det oppsto en feil i sjekking om brukeren er en instruktør ");
+	}*/
 }
