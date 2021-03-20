@@ -49,11 +49,11 @@ public class piazzaController extends DBConn {
 		throw new IllegalStateException("Du er ikke logget inn");
 	}
 	
-	private boolean userInCourseInYear() {
-		
-	}
 
-	public boolean post(int threadID, String content, String postName,  String folderName, String courseID, int courseYear, String tag, boolean anonymous) {
+	/**
+	 * Hjelpemetode som registrerer en post i databasen. Dvs et reply eller en thread(Den første posten).
+	 * */
+	private boolean makePost(int threadID, String content, String postName,  String folderName, String courseID, int courseYear, String tag, boolean anonymous) {
 		if(this.email == null) {
 			throw new IllegalStateException("Du må være logget inn for å poste.");
 		}
@@ -64,14 +64,15 @@ public class piazzaController extends DBConn {
 					"	where user.email = (?) and courseInYear.courseID = (?) and courseInYear.courseYear = (?)");
 			statement.setString(1, this.email);
 			statement.setString(2, courseID);
+			statement.setInt(3, courseYear);
 			ResultSet rs = statement.executeQuery();
 			boolean anonymousAllowed = false;
 			if(!rs.next()) {
 				throw new IllegalArgumentException("Du er ikke oppmeldt i dette emnet.");
 			}
 			anonymousAllowed = rs.getBoolean("allowAnonumous");
-			
-			// Setter in posten
+		
+			// Setter inn posten
 			statement = this.conn.prepareStatement("INSERT INTO post VALUES ( (?), (?), (?), (?), (?), (?), (?), (?))");
 			this.totalPosts += 1;
 			statement.setInt(1, this.totalPosts);
@@ -85,22 +86,16 @@ public class piazzaController extends DBConn {
 			else {
 				statement.setNull(6, 0);
 			}
+			
 			// Sjekker om det er lovlig å være anonym.
 			if (anonymous && !anonymousAllowed) {
 				throw new IllegalArgumentException("Course doesn't allow anonymous posts.");
 			}
 			statement.setBoolean(7, anonymous);
+			
 			// Setter tiden
 			long milliseconds = System.currentTimeMillis();
 			statement.setTime(8, new Time(milliseconds));
-			statement.execute();
-
-			// Legger posten inn i riktig folder
-			statement = this.conn.prepareStatement("INSERT INTO threadInFolder VALUES ( (?), (?), (?), (?) )");
-			statement.setInt(1, threadID);
-			statement.setString(2, folderName);
-			statement.setString(3, courseID);
-			statement.setInt(4, courseYear);
 			statement.execute();
 		} catch(SQLException e) {
 			throw new RuntimeException("Det oppsto en feil", e);
@@ -109,10 +104,39 @@ public class piazzaController extends DBConn {
 		return true;
 	}
 	
-	public boolean post(int threadID, String content, String postName,  String folderName, String courseID, int courseYear, boolean anonymous){
-		return post(threadID, content, postName,  folderName, courseID, courseYear, null, anonymous);
+	
+	/**
+	 * Metode som poster en ny thread.
+	 * */
+	public boolean post(String content, String postName,  String folderName, String courseID, int courseYear, String tag, boolean anonymous) {
+		// Bruker hjelpemetoden makePost
+		makePost(this.totalPosts + 1, content, postName, folderName, courseID, courseYear, tag, anonymous);
+		PreparedStatement statement;
+		try {
+			statement = this.conn.prepareStatement("INSERT INTO threadInFolder VALUES ( (?), (?), (?), (?) )");
+			statement.setInt(1, this.totalPosts);
+			statement.setString(2, folderName);
+			statement.setString(3, courseID);
+			statement.setInt(4, courseYear);
+			statement.execute();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return true;
 	}
-
+	
+	/**
+	 * Metode som poster en ny thread uten tag.
+	 * */
+	public boolean post(String content, String postName,  String folderName, String courseID, int courseYear, boolean anonymous) {
+		return post(content, postName,  folderName, courseID, courseYear, null, anonymous);
+	}
+	
+	
+	/**
+	 * Metode som lager et nytt reply til en tidligere thread.
+	 * */
 	public boolean replyTo(int postID, String replyText, String replyName, boolean isAnonymous) {
 		try {
 			// Vi må først finne threadID til posten vi skal svare på
@@ -130,14 +154,14 @@ public class piazzaController extends DBConn {
 					" inner join courseInYear on courseInYear.courseID = threadInFolder.folderCourseID \n" + 
 					" and courseInYear.courseYear = threadInFolder.folderCourseYear\n" + 
 					" inner join course on course.courseID = courseInYear.courseID\n" + 
-					" where post.threadID = (?)");
+					" where post.postID = (?)");
 			statement.setInt(1, threadID);
 			rs = statement.executeQuery();
 			rs.next();
 			String folderName = rs.getString("folderName");
 			String courseID = rs.getString("courseID");
 			int courseYear = rs.getInt("courseYear");
-			this.post(threadID, replyText, replyName,  folderName, courseID, courseYear, isAnonymous);
+			this.makePost(threadID, replyText, replyName,  folderName, courseID, courseYear, null, isAnonymous);
 			statement = this.conn.prepareStatement("insert into replyTo values ( (?), (?) )");
 			statement.setInt(1, this.totalPosts);
 			statement.setInt(2, threadID);
@@ -157,8 +181,8 @@ public class piazzaController extends DBConn {
 	public static void main(String[] args) {
 		piazzaController controller = new piazzaController();
 		controller.logInUser("bendik@gmail.com", "bendik");
-		controller.post("Min første post", "første", "eksamen", "question", "TDT4100", false, 1);
-		controller.post("Min andre post", "andre", "eksamen", "question", "TDT4100", false, 2);
+		controller.post("min første post", "første", "eksamen", "TDT4100", 2021, "question", true);
+		controller.post("min andre post", "andre", "eksamen", "TDT4100", 2021, false);
 		controller.replyTo(1, "hei", "første reply", true);
 	}
 	
