@@ -173,9 +173,48 @@ public class piazzaController extends DBConn {
 		return true;
 	}
 
-	public boolean searchFor(String content, String courseID, int year) {
-		// Finner hvilket course
-		return true;
+	/**
+	 * Søker etter postene i emnet som inneholder "content"
+	 * */
+	public Collection<Integer> searchFor(String content, String courseID, int year) {
+		// Sjekker om brukeren er innlogget
+		if(this.email == null) {
+			throw new IllegalStateException("Du må være logget inn for å poste.");
+		}
+		Collection<Integer> lst = new ArrayList<Integer>();
+		// Sjekker at brukeren er medlem av emnet dette året.
+		try {
+			PreparedStatement statement = this.conn.prepareStatement("select courseID from user inner join memberOfCourse on user.email = memberOfCourse.email \n" + 
+					"	where memberOfCourse.courseID = (?) and memberOfCourse.mocYear = (?)");
+			statement.setString(1, courseID);
+			statement.setInt(2, year);
+			ResultSet rs = statement.executeQuery();
+			if(!rs.next()) {
+				throw new IllegalArgumentException("Du er ikke oppmeldt i dette faget.");
+			}
+			// Finner alle posts i dette emnet(courseInYear) som inneholder content
+			statement = this.conn.prepareStatement("select post.postId from (select post.postID, courseInYear.courseID, courseInYear.courseYear from courseInYear inner join folder on folder.courseID = courseInYear.courseID\n" + 
+					"	and folder.folderYear = courseInYear.courseYear\n" + 
+					"	inner join threadInFolder on threadInFolder.folderCourseID = folder.courseID\n" + 
+					"    and threadInFolder.folderCourseYear = folder.folderYear\n" + 
+					"    and threadInFolder.folderName = folder.folderName \n" + 
+					"    inner join post on post.postID = threadInFolder.postID) as A \n" + 
+					"    inner join post on post.threadID = A.postID\n" + 
+					"    where A.courseID = (?) and A.courseYear = (?) and (post.content like (?) or post.postName like (?))");
+			statement.setString(1, courseID);
+			statement.setInt(2, year);
+			statement.setString(3, "%" + content + "%");
+			statement.setString(4, "%" + content + "%");
+			rs = statement.executeQuery();
+			lst = new ArrayList<Integer>();
+			while(rs.next()) {
+				lst.add(rs.getInt("post.postID"));
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return lst;
 	}
 
 	public static void main(String[] args) {
@@ -184,6 +223,10 @@ public class piazzaController extends DBConn {
 		controller.post("min første post", "første", "eksamen", "TDT4100", 2021, "question", true);
 		controller.post("min andre post", "andre", "eksamen", "TDT4100", 2021, false);
 		controller.replyTo(1, "hei", "første reply", true);
+		// Spør etter postene som inneholder "post"
+		Collection<Integer> lst = controller.searchFor("post", "TDT4100", 2021);
+		System.out.println("Disse postene inneholder post:");
+		System.out.println(lst);
 	}
 	
 
