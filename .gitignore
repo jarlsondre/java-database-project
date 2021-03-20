@@ -2,6 +2,7 @@
 # JetBrains files
 /.idea
 /*.iml
+/*.DBConn.java
 
 # Java files
 /target

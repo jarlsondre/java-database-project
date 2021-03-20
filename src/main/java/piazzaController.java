@@ -48,23 +48,23 @@ public class piazzaController extends DBConn {
 		}
 		throw new IllegalStateException("Du er ikke logget inn");
 	}
-	
-	
-	public boolean post(String content, String postName,  String folder, String tag, String courseName, boolean anonymous, int threadID) {
+
+	public boolean post(String content, String postName,  String folder, String tag, String courseID, int courseYear, boolean anonymous, int threadID) {
 		if(this.email == null) {
 			throw new IllegalStateException("Du må være logget inn for å poste.");
 		}
 		try {
-			
+			// Henter ut courseID, årstall, foldernavn og om man har lov å poste anonymt i kurset som hører til folderen
 			PreparedStatement statement = this.conn.prepareStatement("select courseInYear.courseID, courseInYear.courseYear, folder.folderName, allowAnonumous from user inner join memberOfCourse on user.email = memberOfCourse.email \n" + 
 					"	inner join courseInYear on memberOfCourse.courseID = courseInYear.courseID\n" + 
 					"    inner join course on course.courseID = courseInYear.courseID\n" + 
 					"	inner join folder on folder.courseID = courseInYear.courseID and folder.folderYear = courseInYear.courseYear\n" + 
-					"	where user.email = (?) and course.courseName = (?)\n" + 
+					"	where user.email = (?) and course.courseID = (?)\n" +
 					"	order by courseYear desc");
 			statement.setString(1, this.email);
-			statement.setString(2, courseName);
+			statement.setString(2, courseID);
 			ResultSet rs = statement.executeQuery();
+			
 			String courseID1 = null;
 			int year = 0;
 			String folderName = null;
@@ -77,9 +77,11 @@ public class piazzaController extends DBConn {
 					anonymousAllowed = rs.getBoolean("allowAnonumous");
 				}
 			}
+			// Dersom spørringen ikke returnerer noen verdier med riktig foldernavn så har ikke brukeren tilgang
 			if(year == 0) {
 				throw new IllegalArgumentException("Du har ikke tilgang til denne folderen.");
 			}
+			// Setter in posten
 			statement = this.conn.prepareStatement("INSERT INTO post VALUES ( (?), (?), (?), (?), (?), (?), (?), (?))");
 			this.totalPosts += 1;
 			statement.setInt(1, this.totalPosts);
@@ -97,9 +99,12 @@ public class piazzaController extends DBConn {
 				throw new IllegalArgumentException("Course doesn't allow anonymous posts.");
 			}
 			statement.setBoolean(7, anonymous);
+			// Setter tiden
 			long milliseconds = System.currentTimeMillis();
 			statement.setTime(8, new Time(milliseconds));
 			statement.execute();
+
+			// Legger posten inn i riktig folder
 			statement = this.conn.prepareStatement("INSERT INTO threadInFolder VALUES ( (?), (?), (?), (?) )");
 			statement.setInt(1, this.totalPosts);
 			statement.setString(2, folderName);
@@ -128,7 +133,8 @@ public class piazzaController extends DBConn {
 				throw new IllegalArgumentException("Det finnes ikke post med denne postID-en");
 			}
 			int threadID = rs.getInt("threadID");
-			statement = this.conn.prepareStatement("select folderName, courseName\n" + 
+			// Henter folderName og courseName til posten vi svarer på
+			statement = this.conn.prepareStatement("select folderName, courseID\n" +
 					" from post inner join threadInFolder on threadInFolder.postID = post.postID\n" + 
 					" inner join courseInYear on courseInYear.courseID = threadInFolder.folderCourseID \n" + 
 					" and courseInYear.courseYear = threadInFolder.folderCourseYear\n" + 
@@ -138,7 +144,7 @@ public class piazzaController extends DBConn {
 			rs = statement.executeQuery();
 			rs.next();
 			String folderName = rs.getString("folderName");
-			String courseName = rs.getString("courseName");
+			String courseName = rs.getString("courseID");
 			this.post(replyText, replyName, folderName, courseName, isAnonymous, threadID);
 			statement = this.conn.prepareStatement("insert into replyTo values ( (?), (?) )");
 			statement.setInt(1, this.totalPosts);
@@ -151,7 +157,8 @@ public class piazzaController extends DBConn {
 		return true;
 	}
 
-	public boolean searchFor(String content) {
+	public boolean searchFor(String content, String courseID, int year) {
+		// Finner hvilket course
 		return true;
 	}
 
