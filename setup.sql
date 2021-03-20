@@ -150,13 +150,21 @@ constraint vP_fk2 foreign key (postID) references post(postID)
 	on update cascade
    	on delete cascade );
 
+
  insert into user values("bendik@gmail.com", "bendik", "bendik");
+insert into user values("jarl@gmail.com", "jarl", "jarl");
+  
  insert into course values("TDT4100", "Objektorientert programmering", "vår");
+insert into course values("TDT4145", "Databaser", "vår");
+  
  insert into courseInYear values("TDT4100", 2021, true); 
- insert into memberOfCourse values("bendik@gmail.com", "TDT4100", 2021, false);
- insert into folder values("TDT4100", 2021, "eksamen");
+ insert into courseInYear values("TDT4145", 2021, true); 
  
- insert into user values("jarl@gmail.com", "jarl", "jarl");
- insert into memberOfCourse values("jarl@gmail.com", "TDT4100", 2021, true);
+ insert into memberOfCourse values("bendik@gmail.com", "TDT4100", 2021, false);
+  insert into memberOfCourse values("bendik@gmail.com", "TDT4145", 2021, false);
+insert into memberOfCourse values("jarl@gmail.com", "TDT4100", 2021, true);
+ 
+ insert into folder values("TDT4100", 2021, "eksamen");
+ insert into folder values("TDT4145", 2021, "eksamen");
  
 

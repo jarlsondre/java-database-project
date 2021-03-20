@@ -222,6 +222,11 @@ public class piazzaController extends DBConn {
 		controller.logInUser("bendik@gmail.com", "bendik");
 		controller.post("min første post", "første", "eksamen", "TDT4100", 2021, "question", true);
 		controller.post("min andre post", "andre", "eksamen", "TDT4100", 2021, false);
+		controller.post("min andre", "andre", "eksamen", "TDT4100", 2021, false);
+		controller.post("min andre", "post", "eksamen", "TDT4100", 2021, false);
+		controller.post("min andre post", "post", "eksamen", "TDT4145", 2021, false);
+		controller.logOutUser();
+		controller.logInUser("jarl@gmail.com", "jarl");
 		controller.replyTo(1, "hei", "første reply", true);
 		// Spør etter postene som inneholder "post"
 		Collection<Integer> lst = controller.searchFor("post", "TDT4100", 2021);
