@@ -48,39 +48,29 @@ public class piazzaController extends DBConn {
 		}
 		throw new IllegalStateException("Du er ikke logget inn");
 	}
+	
+	private boolean userInCourseInYear() {
+		
+	}
 
-	public boolean post(String content, String postName,  String folder, String tag, String courseID, int courseYear, boolean anonymous, int threadID) {
+	public boolean post(int threadID, String content, String postName,  String folderName, String courseID, int courseYear, String tag, boolean anonymous) {
 		if(this.email == null) {
 			throw new IllegalStateException("Du må være logget inn for å poste.");
 		}
 		try {
-			// Henter ut courseID, årstall, foldernavn og om man har lov å poste anonymt i kurset som hører til folderen
-			PreparedStatement statement = this.conn.prepareStatement("select courseInYear.courseID, courseInYear.courseYear, folder.folderName, allowAnonumous from user inner join memberOfCourse on user.email = memberOfCourse.email \n" + 
+			// Sjekker om brukeren er oppmeldt i emnet og om man har lov å poste anonymt i kurset som hører til folderen
+			PreparedStatement statement = this.conn.prepareStatement("select allowAnonumous from user inner join memberOfCourse on user.email = memberOfCourse.email \n" + 
 					"	inner join courseInYear on memberOfCourse.courseID = courseInYear.courseID\n" + 
-					"    inner join course on course.courseID = courseInYear.courseID\n" + 
-					"	inner join folder on folder.courseID = courseInYear.courseID and folder.folderYear = courseInYear.courseYear\n" + 
-					"	where user.email = (?) and course.courseID = (?)\n" +
-					"	order by courseYear desc");
+					"	where user.email = (?) and courseInYear.courseID = (?) and courseInYear.courseYear = (?)");
 			statement.setString(1, this.email);
 			statement.setString(2, courseID);
 			ResultSet rs = statement.executeQuery();
-			
-			String courseID1 = null;
-			int year = 0;
-			String folderName = null;
 			boolean anonymousAllowed = false;
-			while (rs.next()) {
-				if(rs.getString("folder.folderName").equals(folder)) {
-					courseID1 = rs.getString("courseInYear.courseID");
-					year = rs.getInt("courseInYear.courseYear");
-					folderName = rs.getString("folder.folderName");
-					anonymousAllowed = rs.getBoolean("allowAnonumous");
-				}
+			if(!rs.next()) {
+				throw new IllegalArgumentException("Du er ikke oppmeldt i dette emnet.");
 			}
-			// Dersom spørringen ikke returnerer noen verdier med riktig foldernavn så har ikke brukeren tilgang
-			if(year == 0) {
-				throw new IllegalArgumentException("Du har ikke tilgang til denne folderen.");
-			}
+			anonymousAllowed = rs.getBoolean("allowAnonumous");
+			
 			// Setter in posten
 			statement = this.conn.prepareStatement("INSERT INTO post VALUES ( (?), (?), (?), (?), (?), (?), (?), (?))");
 			this.totalPosts += 1;
@@ -95,6 +85,7 @@ public class piazzaController extends DBConn {
 			else {
 				statement.setNull(6, 0);
 			}
+			// Sjekker om det er lovlig å være anonym.
 			if (anonymous && !anonymousAllowed) {
 				throw new IllegalArgumentException("Course doesn't allow anonymous posts.");
 			}
@@ -106,10 +97,10 @@ public class piazzaController extends DBConn {
 
 			// Legger posten inn i riktig folder
 			statement = this.conn.prepareStatement("INSERT INTO threadInFolder VALUES ( (?), (?), (?), (?) )");
-			statement.setInt(1, this.totalPosts);
+			statement.setInt(1, threadID);
 			statement.setString(2, folderName);
-			statement.setString(3, courseID1);
-			statement.setInt(4, year);
+			statement.setString(3, courseID);
+			statement.setInt(4, courseYear);
 			statement.execute();
 		} catch(SQLException e) {
 			throw new RuntimeException("Det oppsto en feil", e);
@@ -118,8 +109,8 @@ public class piazzaController extends DBConn {
 		return true;
 	}
 	
-	public boolean post(String content, String postName,  String folder, String courseName, boolean anonymous, int threadID) {
-		return this.post(content, postName, folder, null, courseName, anonymous, threadID);
+	public boolean post(int threadID, String content, String postName,  String folderName, String courseID, int courseYear, boolean anonymous){
+		return post(threadID, content, postName,  folderName, courseID, courseYear, null, anonymous);
 	}
 
 	public boolean replyTo(int postID, String replyText, String replyName, boolean isAnonymous) {
@@ -134,7 +125,7 @@ public class piazzaController extends DBConn {
 			}
 			int threadID = rs.getInt("threadID");
 			// Henter folderName og courseName til posten vi svarer på
-			statement = this.conn.prepareStatement("select folderName, courseID\n" +
+			statement = this.conn.prepareStatement("select folderName, courseID, courseYear\n" +
 					" from post inner join threadInFolder on threadInFolder.postID = post.postID\n" + 
 					" inner join courseInYear on courseInYear.courseID = threadInFolder.folderCourseID \n" + 
 					" and courseInYear.courseYear = threadInFolder.folderCourseYear\n" + 
@@ -144,8 +135,9 @@ public class piazzaController extends DBConn {
 			rs = statement.executeQuery();
 			rs.next();
 			String folderName = rs.getString("folderName");
-			String courseName = rs.getString("courseID");
-			this.post(replyText, replyName, folderName, courseName, isAnonymous, threadID);
+			String courseID = rs.getString("courseID");
+			int courseYear = rs.getInt("courseYear");
+			this.post(threadID, replyText, replyName,  folderName, courseID, courseYear, isAnonymous);
 			statement = this.conn.prepareStatement("insert into replyTo values ( (?), (?) )");
 			statement.setInt(1, this.totalPosts);
 			statement.setInt(2, threadID);
