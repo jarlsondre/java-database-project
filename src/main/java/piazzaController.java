@@ -149,7 +149,7 @@ public class piazzaController extends DBConn {
 			}
 			int threadID = rs.getInt("threadID");
 			// Henter folderName og courseName til posten vi svarer på
-			statement = this.conn.prepareStatement("select folderName, courseID, courseYear\n" +
+			statement = this.conn.prepareStatement("select folderName, courseInYear.courseID, courseInYear.courseYear\n" +
 					" from post inner join threadInFolder on threadInFolder.postID = post.postID\n" + 
 					" inner join courseInYear on courseInYear.courseID = threadInFolder.folderCourseID \n" + 
 					" and courseInYear.courseYear = threadInFolder.folderCourseYear\n" + 
