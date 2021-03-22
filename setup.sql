@@ -84,10 +84,10 @@ create table post(
    	threadID		integer not null,
 	userEmail		varchar(30) not null,
 	postName		varchar(30) not null, 
-	content		varchar(500) not null, 
-	tag			varchar(30),
+	content			varchar(500) not null, 
+	tag				varchar(30),
 	isAnonymous		boolean not null, 
-    	creationTime		time not null,
+	creationTime		datetime not null,
     	constraint post_pk primary key (postID),
 	constraint post_fk1 foreign key (userEmail) references user(email)
     		on update cascade 
@@ -139,9 +139,7 @@ constraint lP_fk2 foreign key (postID) references post(postID)
 create table viewedPost(
 email		varchar(30),
 postID		integer,
-vpYear		integer not null,
-vpMonth	integer not null,
-voDay		integer not null,
+viewDateTime datetime not null, 
 constraint vP_pk1 primary key (email, postID),
 constraint vP_fk1 foreign key (email) references user(email)
 	on update cascade 
@@ -152,7 +150,7 @@ constraint vP_fk2 foreign key (postID) references post(postID)
 
 
  insert into user values("bendik@gmail.com", "bendik", "bendik");
-insert into user values("jarl@gmail.com", "jarl", "jarl");
+insert into user values("sveinogroger@gmail.com", "svein", "roger");
   
  insert into course values("TDT4100", "Objektorientert programmering", "vår");
 insert into course values("TDT4145", "Databaser", "vår");
@@ -162,9 +160,10 @@ insert into course values("TDT4145", "Databaser", "vår");
  
  insert into memberOfCourse values("bendik@gmail.com", "TDT4100", 2021, false);
   insert into memberOfCourse values("bendik@gmail.com", "TDT4145", 2021, false);
-insert into memberOfCourse values("jarl@gmail.com", "TDT4100", 2021, true);
+insert into memberOfCourse values("sveinogroger@gmail.com", "TDT4145", 2021, true);
  
  insert into folder values("TDT4100", 2021, "eksamen");
  insert into folder values("TDT4145", 2021, "eksamen");
+ 
  
 
